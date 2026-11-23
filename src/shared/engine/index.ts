@@ -2,3 +2,6 @@ export * from './types.ts';
 export * from './operations.ts';
 export * from './scoring.ts';
 export * from './engine.ts';
+export * from './validator.ts';
+export * from './solver.ts';
+export * from './catalog.ts';
