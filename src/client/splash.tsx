@@ -1,60 +1,67 @@
 import './index.css';
 
-import { navigateTo } from '@devvit/web/client';
-import { context, requestExpandedMode } from '@devvit/web/client';
+import { requestExpandedMode } from '@devvit/web/client';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { CURATED_PUZZLES } from '../shared/engine/index.ts';
 
 export const Splash = () => {
+  const activePuzzle = CURATED_PUZZLES[0] ?? {
+    date: '2026-11-23',
+    startValue: 3,
+    targetValue: 23,
+    moveLimit: 5,
+  };
+
   return (
-    <div className="flex relative flex-col justify-center items-center min-h-screen gap-4 bg-white dark:bg-gray-900">
-      <img
-        className="object-contain w-1/2 max-w-[250px] mx-auto"
-        src="/snoo.png"
-        alt="Snoo"
-      />
-      <div className="flex flex-col items-center gap-2">
-        <h1 className="text-2xl font-bold text-center text-gray-900 dark:text-white">
-          Hey {context.username ?? 'user'} 👋
-        </h1>
-        <p className="text-base text-center text-gray-600 dark:text-gray-300">
-          Edit{' '}
-          <span className="bg-[#e5ebee] dark:bg-gray-700 px-1 py-0.5 rounded">
-            src/client/splash.tsx
-          </span>{' '}
-          to get started.
+    <div className="flex relative flex-col justify-center items-center min-h-screen p-4 bg-[#0a0e17] text-slate-100">
+      <div className="w-full max-w-sm flex flex-col items-center gap-5 p-6 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-2xl text-center">
+        {/* Header Badge */}
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+          <h1 className="text-xl font-black tracking-wider uppercase bg-gradient-to-r from-cyan-400 via-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
+            Daily Paradox
+          </h1>
+        </div>
+
+        {/* Subtitle */}
+        <p className="text-xs text-slate-400 max-w-[260px] leading-relaxed">
+          One math operation is secretly broken. Spot the paradox to reach the target!
         </p>
-      </div>
-      <div className="flex items-center justify-center mt-5">
+
+        {/* Daily Mission Teaser */}
+        <div className="w-full grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 font-mono">
+          <div className="flex flex-col items-center">
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+              Start
+            </span>
+            <span className="text-xl font-bold text-slate-200">
+              {activePuzzle.startValue}
+            </span>
+          </div>
+          <div className="flex flex-col items-center border-l border-slate-800">
+            <span className="text-[10px] text-cyan-500 uppercase tracking-wider">
+              Target
+            </span>
+            <span className="text-xl font-bold text-cyan-300">
+              {activePuzzle.targetValue}
+            </span>
+          </div>
+        </div>
+
+        {/* Play Action */}
         <button
-          className="flex items-center justify-center bg-[#d93900] dark:bg-orange-600 text-white w-auto h-10 rounded-full cursor-pointer transition-colors px-4 hover:bg-[#c23300] dark:hover:bg-orange-700"
+          type="button"
           onClick={(e) => requestExpandedMode(e.nativeEvent, 'game')}
+          className="w-full py-3 px-5 rounded-xl font-bold text-sm uppercase tracking-wider bg-gradient-to-r from-cyan-500 to-violet-600 hover:from-cyan-400 hover:to-violet-500 text-white shadow-lg shadow-violet-900/40 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-cyan-400 cursor-pointer"
         >
-          Tap to Start
+          Play Today&apos;s Paradox
         </button>
+
+        <span className="text-[10px] text-slate-500 font-mono">
+          {activePuzzle.date} • Free daily logic challenge
+        </span>
       </div>
-      <footer className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-3 text-[0.8em] text-gray-600 dark:text-gray-400">
-        <button
-          className="cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors"
-          onClick={() => navigateTo('https://developers.reddit.com/docs')}
-        >
-          Docs
-        </button>
-        <span className="text-gray-300 dark:text-gray-600">|</span>
-        <button
-          className="cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors"
-          onClick={() => navigateTo('https://www.reddit.com/r/Devvit')}
-        >
-          r/Devvit
-        </button>
-        <span className="text-gray-300 dark:text-gray-600">|</span>
-        <button
-          className="cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors"
-          onClick={() => navigateTo('https://discord.com/invite/R7yu2wh9Qz')}
-        >
-          Discord
-        </button>
-      </footer>
     </div>
   );
 };
