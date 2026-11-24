@@ -7,6 +7,7 @@ import type {
   HintTier,
   MoveHistoryItem,
   Puzzle,
+  SanitizedPuzzle,
 } from './types.ts';
 
 export const initGameState = (puzzle: Puzzle): GameState => {
@@ -187,10 +188,6 @@ export const markParadoxDeduced = (
     ...state,
     paradoxDeduced: deduced,
   };
-};
-
-export type SanitizedPuzzle = Omit<Puzzle, 'operations'> & {
-  operations: ClientOperation[];
 };
 
 export const sanitizePuzzleForClient = (puzzle: Puzzle): SanitizedPuzzle => {

@@ -94,3 +94,7 @@ export type ScoreBreakdown = {
   hintPenalty: number;
   totalScore: number;
 };
+
+export type SanitizedPuzzle = Omit<Puzzle, 'operations'> & {
+  operations: ClientOperation[];
+};

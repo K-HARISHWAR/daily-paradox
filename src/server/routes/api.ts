@@ -4,7 +4,14 @@ import type {
   DecrementResponse,
   IncrementResponse,
   InitResponse,
+  DailyPuzzleResponse,
 } from '../../shared/api';
+import {
+  getDailyPuzzle,
+  getUtcDateString,
+  getMillisecondsUntilNextUtcReset,
+  sanitizePuzzleForClient,
+} from '../../shared/engine/index.ts';
 
 type ErrorResponse = {
   status: 'error';
@@ -12,6 +19,26 @@ type ErrorResponse = {
 };
 
 export const api = new Hono();
+
+api.get('/daily', (c) => {
+  const dateQuery = c.req.query('date');
+  const puzzleQuery = c.req.query('puzzle');
+
+  const puzzle = getDailyPuzzle(dateQuery, puzzleQuery);
+  const sanitized = sanitizePuzzleForClient(puzzle);
+  const now = new Date();
+  const serverUtcDate = getUtcDateString(now);
+  const msUntilReset = getMillisecondsUntilNextUtcReset(now);
+  const isOverride = Boolean(dateQuery || puzzleQuery);
+
+  return c.json<DailyPuzzleResponse>({
+    type: 'daily',
+    puzzle: sanitized,
+    serverUtcDate,
+    msUntilReset,
+    isOverride,
+  });
+});
 
 api.get('/init', async (c) => {
   const { postId } = context;

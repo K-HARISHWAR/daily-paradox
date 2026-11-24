@@ -1,17 +1,12 @@
 import './index.css';
 
 import { requestExpandedMode } from '@devvit/web/client';
-import { StrictMode } from 'react';
+import { StrictMode, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
-import { CURATED_PUZZLES } from '../shared/engine/index.ts';
+import { getDailyPuzzle } from '../shared/engine/index.ts';
 
 export const Splash = () => {
-  const activePuzzle = CURATED_PUZZLES[0] ?? {
-    date: '2026-11-23',
-    startValue: 3,
-    targetValue: 23,
-    moveLimit: 5,
-  };
+  const activePuzzle = useMemo(() => getDailyPuzzle(), []);
 
   return (
     <div className="flex relative flex-col justify-center items-center min-h-screen p-4 bg-[#0a0e17] text-slate-100">
@@ -58,9 +53,10 @@ export const Splash = () => {
           Play Today&apos;s Paradox
         </button>
 
-        <span className="text-[10px] text-slate-500 font-mono">
-          {activePuzzle.date} • Free daily logic challenge
-        </span>
+        <div className="flex flex-col gap-0.5 text-[10px] text-slate-500 font-mono">
+          <span>{activePuzzle.date} • Free daily logic challenge</span>
+          <span>New puzzle every day at 00:00 UTC</span>
+        </div>
       </div>
     </div>
   );

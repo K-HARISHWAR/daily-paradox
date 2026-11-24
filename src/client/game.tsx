@@ -1,6 +1,6 @@
 import './index.css';
 
-import { StrictMode, useState, useCallback, useMemo } from 'react';
+import { StrictMode, useState, useCallback, useMemo, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { showToast } from '@devvit/web/client';
 import {
@@ -9,8 +9,10 @@ import {
   resetRun,
   unlockHint,
   calculateScore,
-  CURATED_PUZZLES,
   sanitizePuzzleForClient,
+  getDailyPuzzle,
+  getMillisecondsUntilNextUtcReset,
+  formatTimeUntilReset,
 } from '../shared/engine/index.ts';
 import type { GameState, HintTier, Puzzle, ScoreBreakdown } from '../shared/engine/index.ts';
 import { Header } from './components/Header.tsx';
@@ -21,26 +23,43 @@ import { HelpModal } from './components/HelpModal.tsx';
 import { ResultModal } from './components/ResultModal.tsx';
 import { HintModal } from './components/HintModal.tsx';
 
-const FALLBACK_PUZZLE: Puzzle = {
-  id: 'fallback-01',
-  date: '2026-11-23',
-  startValue: 3,
-  targetValue: 23,
-  moveLimit: 5,
-  parMoves: 3,
-  operations: [],
-  hints: [
-    { tier: 1, title: 'Nudge', description: 'Observe', penalty: 100 },
-    { tier: 2, title: 'Suspect', description: 'Suspect', penalty: 250 },
-    { tier: 3, title: 'Reveal', description: 'Reveal', penalty: 500 },
-  ],
-};
-
 const ONBOARDING_KEY = 'daily_paradox_seen_onboarding';
 
+type ResolvedPuzzleInfo = {
+  puzzle: Puzzle;
+  isDevOverride: boolean;
+};
+
+const resolvePuzzle = (): ResolvedPuzzleInfo => {
+  if (typeof window !== 'undefined' && window.location) {
+    const params = new URLSearchParams(window.location.search);
+    const puzzleParam = params.get('puzzle');
+    const dateParam = params.get('date');
+
+    if (puzzleParam) {
+      return {
+        puzzle: getDailyPuzzle(undefined, puzzleParam),
+        isDevOverride: true,
+      };
+    }
+    if (dateParam) {
+      return {
+        puzzle: getDailyPuzzle(dateParam),
+        isDevOverride: true,
+      };
+    }
+  }
+  return {
+    puzzle: getDailyPuzzle(),
+    isDevOverride: false,
+  };
+};
+
 export const App = () => {
-  // Use first curated puzzle for MVP interface (Phase 6 hooks up daily resolver)
-  const activePuzzle: Puzzle = CURATED_PUZZLES[0] ?? FALLBACK_PUZZLE;
+  const { puzzle: activePuzzle, isDevOverride } = useMemo(
+    () => resolvePuzzle(),
+    []
+  );
 
   const [gameState, setGameState] = useState<GameState>(() =>
     initGameState(activePuzzle)
@@ -54,13 +73,26 @@ export const App = () => {
           return true;
         }
       } catch {
-        // Fallback gracefully if localStorage is unavailable
+        // Fallback gracefully
       }
     }
     return false;
   });
   const [hintModalOpen, setHintModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [countdownText, setCountdownText] = useState<string>('');
+
+  // Live countdown to next 00:00 UTC daily puzzle reset
+  useEffect(() => {
+    const updateCountdown = () => {
+      const ms = getMillisecondsUntilNextUtcReset();
+      setCountdownText(`${formatTimeUntilReset(ms)} until next puzzle (UTC)`);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const clientPuzzle = useMemo(
     () => sanitizePuzzleForClient(activePuzzle),
@@ -142,6 +174,8 @@ Can you deduce the broken button?`;
       <div className="w-full max-w-lg flex flex-col min-h-screen border-x border-slate-900/60 shadow-2xl">
         <Header
           puzzleDate={activePuzzle.date}
+          countdownText={countdownText}
+          isDevOverride={isDevOverride}
           onOpenHelp={() => setHelpOpen(true)}
           onOpenHints={() => setHintModalOpen(true)}
           unlockedHintCount={gameState.unlockedHintTier}
@@ -189,8 +223,8 @@ Can you deduce the broken button?`;
             <MoveHistory history={gameState.history} />
           </div>
 
-          <footer className="w-full text-center py-2 text-[11px] text-slate-500 border-t border-slate-900/80">
-            <span>Daily Paradox • Reddit Interactive Game</span>
+          <footer className="w-full text-center py-2 text-[11px] text-slate-500 border-t border-slate-900/80 flex flex-col gap-0.5">
+            <span>Daily Paradox • Resets daily at 00:00 UTC</span>
           </footer>
         </main>
       </div>
