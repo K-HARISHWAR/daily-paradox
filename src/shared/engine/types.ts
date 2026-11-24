@@ -98,3 +98,24 @@ export type ScoreBreakdown = {
 export type SanitizedPuzzle = Omit<Puzzle, 'operations'> & {
   operations: ClientOperation[];
 };
+
+export type PlayerDailyRecord = {
+  puzzleId: string;
+  puzzleDate: string;
+  completed: boolean;
+  movesTaken: number;
+  score: number;
+  hintsUsed: number;
+  completedAt: string;
+  moveSequence: string[];
+};
+
+export type PlayerProgress = {
+  userId: string;
+  username: string;
+  currentStreak: number;
+  maxStreak: number;
+  totalCompleted: number;
+  lastCompletedDate: string | null;
+  todayRecord: PlayerDailyRecord | null;
+};

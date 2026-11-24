@@ -15,6 +15,7 @@ import {
   formatTimeUntilReset,
 } from '../shared/engine/index.ts';
 import type { GameState, HintTier, Puzzle, ScoreBreakdown } from '../shared/engine/index.ts';
+import type { SubmitScoreRequest } from '../shared/api.ts';
 import { Header } from './components/Header.tsx';
 import { Dashboard } from './components/Dashboard.tsx';
 import { OperationsGrid } from './components/OperationsGrid.tsx';
@@ -81,6 +82,7 @@ export const App = () => {
   const [hintModalOpen, setHintModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [countdownText, setCountdownText] = useState<string>('');
+  const [currentStreak, setCurrentStreak] = useState<number>(0);
 
   // Live countdown to next 00:00 UTC daily puzzle reset
   useEffect(() => {
@@ -94,6 +96,63 @@ export const App = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Fetch initial progress from server
+  useEffect(() => {
+    const fetchProgress = async () => {
+      try {
+        const res = await fetch('/api/progress');
+        if (res.ok) {
+          const data: unknown = await res.json();
+          if (
+            typeof data === 'object' &&
+            data !== null &&
+            'currentStreak' in data &&
+            typeof data.currentStreak === 'number'
+          ) {
+            setCurrentStreak(data.currentStreak);
+          }
+        }
+      } catch {
+        // Graceful fallback for offline / mock testing
+      }
+    };
+    void fetchProgress();
+  }, []);
+
+  const submitWinCompletion = useCallback(
+    async (state: GameState) => {
+      try {
+        const payload: SubmitScoreRequest = {
+          puzzleId: activePuzzle.id,
+          puzzleDate: activePuzzle.date,
+          moveSequence: state.history.map((h) => h.operationId),
+          unlockedHintTier: state.unlockedHintTier,
+        };
+
+        const res = await fetch('/api/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          const data: unknown = await res.json();
+          if (
+            typeof data === 'object' &&
+            data !== null &&
+            'currentStreak' in data &&
+            typeof data.currentStreak === 'number'
+          ) {
+            setCurrentStreak(data.currentStreak);
+          }
+        }
+      } catch {
+        // Gracefully continue with client score
+      }
+    },
+    [activePuzzle.id, activePuzzle.date]
+  );
+
   const clientPuzzle = useMemo(
     () => sanitizePuzzleForClient(activePuzzle),
     [activePuzzle]
@@ -105,11 +164,14 @@ export const App = () => {
       const res = applyMove(gameState, activePuzzle, operationId);
       if (res.success) {
         setGameState(res.state);
+        if (res.state.status === 'won') {
+          void submitWinCompletion(res.state);
+        }
       } else if (res.error) {
         setErrorMessage(res.error);
       }
     },
-    [gameState, activePuzzle]
+    [gameState, activePuzzle, submitWinCompletion]
   );
 
   const handleReset = useCallback(() => {
@@ -146,10 +208,11 @@ export const App = () => {
     const moves = gameState.movesTaken;
     const score = gameState.score ?? 0;
     const hintsUsed = gameState.unlockedHintTier;
+    const streakStr = currentStreak > 0 ? ` • 🔥 Streak: ${currentStreak}d` : '';
 
     const shareText = `DAILY PARADOX [${activePuzzle.date}]
 ${isWon ? '🎯 Solved in' : '✕ Out of moves:'} ${moves} moves (Par: ${activePuzzle.parMoves})
-Score: ${score} pts • Hints used: ${hintsUsed}/3
+Score: ${score} pts • Hints: ${hintsUsed}/3${streakStr}
 Can you deduce the broken button?`;
 
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -164,7 +227,7 @@ Can you deduce the broken button?`;
     } else {
       showToast('Clipboard not available.');
     }
-  }, [gameState, activePuzzle]);
+  }, [gameState, activePuzzle, currentStreak]);
 
   const isGameOver =
     gameState.status === 'won' || gameState.status === 'lost';
@@ -176,6 +239,7 @@ Can you deduce the broken button?`;
           puzzleDate={activePuzzle.date}
           countdownText={countdownText}
           isDevOverride={isDevOverride}
+          currentStreak={currentStreak}
           onOpenHelp={() => setHelpOpen(true)}
           onOpenHints={() => setHintModalOpen(true)}
           unlockedHintCount={gameState.unlockedHintTier}
@@ -247,6 +311,7 @@ Can you deduce the broken button?`;
           movesTaken={gameState.movesTaken}
           parMoves={activePuzzle.parMoves}
           puzzleDate={activePuzzle.date}
+          currentStreak={currentStreak}
           onReset={handleReset}
           onShare={handleShare}
         />

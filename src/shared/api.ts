@@ -26,3 +26,38 @@ export type DailyPuzzleResponse = {
   msUntilReset: number;
   isOverride: boolean;
 };
+
+export type SubmitScoreRequest = {
+  puzzleId: string;
+  puzzleDate: string;
+  moveSequence: string[];
+  unlockedHintTier: 0 | 1 | 2 | 3;
+};
+
+export type CompletePuzzleResponse = {
+  type: 'complete';
+  success: boolean;
+  score: number;
+  currentStreak: number;
+  maxStreak: number;
+  totalCompleted: number;
+  isDuplicate: boolean;
+  error?: string;
+};
+
+export type ProgressResponse = {
+  type: 'progress';
+  userId: string;
+  username: string;
+  currentStreak: number;
+  maxStreak: number;
+  totalCompleted: number;
+  lastCompletedDate: string | null;
+  hasCompletedToday: boolean;
+  todayRecord: {
+    puzzleDate: string;
+    movesTaken: number;
+    score: number;
+    hintsUsed: number;
+  } | null;
+};

@@ -7,6 +7,7 @@ export type ResultModalProps = {
   movesTaken: number;
   parMoves: number;
   puzzleDate: string;
+  currentStreak?: number;
   onReset: () => void;
   onShare: () => void;
 };
@@ -18,6 +19,7 @@ export const ResultModal = ({
   movesTaken,
   parMoves,
   puzzleDate,
+  currentStreak,
   onReset,
   onShare,
 }: ResultModalProps) => {
@@ -54,6 +56,13 @@ export const ResultModal = ({
               ? `You mastered the daily challenge for ${puzzleDate}`
               : 'The move limit was reached. Reset to try again!'}
           </p>
+
+          {isWon && typeof currentStreak === 'number' && currentStreak > 0 ? (
+            <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-0.5 rounded-full bg-orange-950/50 border border-orange-700/60 text-orange-300 text-xs font-semibold">
+              <span>🔥</span>
+              <span>{currentStreak} Day Streak!</span>
+            </div>
+          ) : null}
         </div>
 
         {isWon && score !== null ? (

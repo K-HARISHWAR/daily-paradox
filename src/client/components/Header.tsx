@@ -2,6 +2,7 @@ export type HeaderProps = {
   puzzleDate: string;
   countdownText?: string;
   isDevOverride?: boolean;
+  currentStreak?: number;
   onOpenHelp: () => void;
   onOpenHints: () => void;
   unlockedHintCount: number;
@@ -13,6 +14,7 @@ export const Header = ({
   puzzleDate,
   countdownText,
   isDevOverride,
+  currentStreak,
   onOpenHelp,
   onOpenHints,
   unlockedHintCount,
@@ -30,6 +32,15 @@ export const Header = ({
           {isDevOverride ? (
             <span className="text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded">
               Dev Mode
+            </span>
+          ) : null}
+          {typeof currentStreak === 'number' && currentStreak > 0 ? (
+            <span
+              title={`${currentStreak} day streak`}
+              className="text-[10px] font-bold uppercase tracking-wider bg-orange-950/60 text-orange-400 border border-orange-700/50 px-1.5 py-0.5 rounded flex items-center gap-1"
+            >
+              <span>🔥</span>
+              <span>{currentStreak}</span>
             </span>
           ) : null}
         </div>
