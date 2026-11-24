@@ -1,6 +1,9 @@
+import type { ScoreBreakdown } from '../../shared/engine/types.ts';
+
 export type ResultModalProps = {
   status: 'won' | 'lost';
   score: number | null;
+  scoreBreakdown?: ScoreBreakdown | null;
   movesTaken: number;
   parMoves: number;
   puzzleDate: string;
@@ -11,6 +14,7 @@ export type ResultModalProps = {
 export const ResultModal = ({
   status,
   score,
+  scoreBreakdown,
   movesTaken,
   parMoves,
   puzzleDate,
@@ -53,16 +57,51 @@ export const ResultModal = ({
         </div>
 
         {isWon && score !== null ? (
-          <div className="w-full bg-slate-800/50 border border-slate-800 rounded-xl p-3 flex flex-col gap-2 font-mono">
-            <div className="flex justify-between items-center text-xs text-slate-400">
-              <span>Moves:</span>
+          <div className="w-full bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 flex flex-col gap-2 font-mono text-xs">
+            <div className="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-1.5">
+              <span>Moves Taken:</span>
               <span className="font-bold text-white">
-                {movesTaken} (Par {parMoves})
+                {movesTaken} / Par {parMoves}
               </span>
             </div>
-            <div className="flex justify-between items-center text-xs text-slate-400">
+
+            {/* Detailed transparent breakdown */}
+            {scoreBreakdown ? (
+              <div className="flex flex-col gap-1 text-[11px] text-slate-400">
+                <div className="flex justify-between">
+                  <span>Base Score:</span>
+                  <span className="text-slate-300">+{scoreBreakdown.baseScore}</span>
+                </div>
+                {scoreBreakdown.parBonus > 0 ? (
+                  <div className="flex justify-between text-emerald-400">
+                    <span>Par Bonus (≤ {parMoves} moves):</span>
+                    <span>+{scoreBreakdown.parBonus}</span>
+                  </div>
+                ) : null}
+                {scoreBreakdown.extraMovePenalty > 0 ? (
+                  <div className="flex justify-between text-rose-400">
+                    <span>Extra Move Penalty:</span>
+                    <span>-{scoreBreakdown.extraMovePenalty}</span>
+                  </div>
+                ) : null}
+                {scoreBreakdown.pureDeductionBonus > 0 ? (
+                  <div className="flex justify-between text-violet-300">
+                    <span>Pure Deduction Bonus:</span>
+                    <span>+{scoreBreakdown.pureDeductionBonus}</span>
+                  </div>
+                ) : null}
+                {scoreBreakdown.hintPenalty > 0 ? (
+                  <div className="flex justify-between text-amber-400">
+                    <span>Hints Used:</span>
+                    <span>-{scoreBreakdown.hintPenalty}</span>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            <div className="flex justify-between items-center text-xs text-slate-300 border-t border-slate-800 pt-2 font-sans font-bold">
               <span>Final Score:</span>
-              <span className="text-base font-extrabold text-cyan-300">
+              <span className="text-base font-extrabold text-cyan-300 font-mono">
                 {score} pts
               </span>
             </div>
@@ -74,7 +113,7 @@ export const ResultModal = ({
             <button
               type="button"
               onClick={onShare}
-              className="w-full py-2.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider bg-gradient-to-r from-cyan-500 to-violet-600 hover:from-cyan-400 hover:to-violet-500 text-white shadow-lg shadow-violet-900/30 transition-all focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              className="w-full py-2.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider bg-gradient-to-r from-cyan-500 to-violet-600 hover:from-cyan-400 hover:to-violet-500 text-white shadow-lg shadow-violet-900/30 transition-all focus:outline-none focus:ring-2 focus:ring-cyan-400 cursor-pointer"
             >
               Share Result
             </button>
@@ -83,7 +122,7 @@ export const ResultModal = ({
           <button
             type="button"
             onClick={onReset}
-            className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border ${
+            className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border cursor-pointer ${
               isWon
                 ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
                 : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-500 shadow-lg shadow-rose-900/30'

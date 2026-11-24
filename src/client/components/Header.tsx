@@ -1,6 +1,8 @@
 export type HeaderProps = {
   puzzleDate: string;
   onOpenHelp: () => void;
+  onOpenHints: () => void;
+  unlockedHintCount: number;
   onReset: () => void;
   canReset: boolean;
 };
@@ -8,6 +10,8 @@ export type HeaderProps = {
 export const Header = ({
   puzzleDate,
   onOpenHelp,
+  onOpenHints,
+  unlockedHintCount,
   onReset,
   canReset,
 }: HeaderProps) => {
@@ -26,6 +30,21 @@ export const Header = ({
       </div>
 
       <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenHints}
+          aria-label="Open hints"
+          className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400/50 ${
+            unlockedHintCount > 0
+              ? 'bg-amber-950/40 border-amber-600/60 text-amber-300'
+              : 'border-slate-700 bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700'
+          }`}
+        >
+          <span>💡</span>
+          <span className="hidden sm:inline">Hints</span>
+          <span className="font-mono text-[11px]">({unlockedHintCount}/3)</span>
+        </button>
+
         <button
           type="button"
           onClick={onReset}

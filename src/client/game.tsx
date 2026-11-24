@@ -7,16 +7,19 @@ import {
   initGameState,
   applyMove,
   resetRun,
+  unlockHint,
+  calculateScore,
   CURATED_PUZZLES,
   sanitizePuzzleForClient,
 } from '../shared/engine/index.ts';
-import type { GameState, Puzzle } from '../shared/engine/index.ts';
+import type { GameState, HintTier, Puzzle, ScoreBreakdown } from '../shared/engine/index.ts';
 import { Header } from './components/Header.tsx';
 import { Dashboard } from './components/Dashboard.tsx';
 import { OperationsGrid } from './components/OperationsGrid.tsx';
 import { MoveHistory } from './components/MoveHistory.tsx';
 import { HelpModal } from './components/HelpModal.tsx';
 import { ResultModal } from './components/ResultModal.tsx';
+import { HintModal } from './components/HintModal.tsx';
 
 const FALLBACK_PUZZLE: Puzzle = {
   id: 'fallback-01',
@@ -33,6 +36,8 @@ const FALLBACK_PUZZLE: Puzzle = {
   ],
 };
 
+const ONBOARDING_KEY = 'daily_paradox_seen_onboarding';
+
 export const App = () => {
   // Use first curated puzzle for MVP interface (Phase 6 hooks up daily resolver)
   const activePuzzle: Puzzle = CURATED_PUZZLES[0] ?? FALLBACK_PUZZLE;
@@ -40,7 +45,21 @@ export const App = () => {
   const [gameState, setGameState] = useState<GameState>(() =>
     initGameState(activePuzzle)
   );
-  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const seen = window.localStorage.getItem(ONBOARDING_KEY);
+        if (!seen) {
+          window.localStorage.setItem(ONBOARDING_KEY, 'true');
+          return true;
+        }
+      } catch {
+        // Fallback gracefully if localStorage is unavailable
+      }
+    }
+    return false;
+  });
+  const [hintModalOpen, setHintModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const clientPuzzle = useMemo(
@@ -66,14 +85,39 @@ export const App = () => {
     setGameState((prev) => resetRun(prev, activePuzzle));
   }, [activePuzzle]);
 
+  const handleUnlockHint = useCallback(
+    (nextTier: HintTier) => {
+      setGameState((prev) => unlockHint(prev, nextTier));
+      showToast(`Tier ${nextTier} hint unlocked!`);
+    },
+    []
+  );
+
+  const scoreBreakdown: ScoreBreakdown | null = useMemo(() => {
+    if (gameState.status !== 'won') return null;
+    return calculateScore(
+      gameState.movesTaken,
+      activePuzzle.parMoves,
+      gameState.unlockedHintTier,
+      gameState.paradoxDeduced
+    );
+  }, [
+    gameState.status,
+    gameState.movesTaken,
+    gameState.unlockedHintTier,
+    gameState.paradoxDeduced,
+    activePuzzle.parMoves,
+  ]);
+
   const handleShare = useCallback(() => {
     const isWon = gameState.status === 'won';
     const moves = gameState.movesTaken;
     const score = gameState.score ?? 0;
+    const hintsUsed = gameState.unlockedHintTier;
 
     const shareText = `DAILY PARADOX [${activePuzzle.date}]
 ${isWon ? '🎯 Solved in' : '✕ Out of moves:'} ${moves} moves (Par: ${activePuzzle.parMoves})
-Score: ${score} pts
+Score: ${score} pts • Hints used: ${hintsUsed}/3
 Can you deduce the broken button?`;
 
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -99,6 +143,8 @@ Can you deduce the broken button?`;
         <Header
           puzzleDate={activePuzzle.date}
           onOpenHelp={() => setHelpOpen(true)}
+          onOpenHints={() => setHintModalOpen(true)}
+          unlockedHintCount={gameState.unlockedHintTier}
           onReset={handleReset}
           canReset={gameState.movesTaken > 0 || isGameOver}
         />
@@ -125,7 +171,7 @@ Can you deduce the broken button?`;
                 <button
                   type="button"
                   onClick={() => setErrorMessage(null)}
-                  className="text-rose-400 hover:text-rose-200 font-bold ml-2"
+                  className="text-rose-400 hover:text-rose-200 font-bold ml-2 cursor-pointer"
                 >
                   ✕
                 </button>
@@ -151,10 +197,19 @@ Can you deduce the broken button?`;
 
       <HelpModal isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
 
+      <HintModal
+        isOpen={hintModalOpen}
+        onClose={() => setHintModalOpen(false)}
+        hints={activePuzzle.hints}
+        unlockedHintTier={gameState.unlockedHintTier}
+        onUnlockNext={handleUnlockHint}
+      />
+
       {isGameOver ? (
         <ResultModal
           status={gameState.status === 'won' ? 'won' : 'lost'}
           score={gameState.score}
+          scoreBreakdown={scoreBreakdown}
           movesTaken={gameState.movesTaken}
           parMoves={activePuzzle.parMoves}
           puzzleDate={activePuzzle.date}
