@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { UiResponse } from '@devvit/web/shared';
 import { context } from '@devvit/web/server';
-import { createPost } from '../core/post';
+import { createPost } from '../core/post.ts';
 
 export const menu = new Hono();
 
@@ -12,6 +12,7 @@ menu.post('/post-create', async (c) => {
     return c.json<UiResponse>(
       {
         navigateTo: `https://reddit.com/r/${context.subredditName}/comments/${post.id}`,
+        showToast: 'Daily Paradox post created!',
       },
       200
     );
@@ -26,7 +27,7 @@ menu.post('/post-create', async (c) => {
   }
 });
 
-menu.post('/example-form', async (c) => {
+menu.post('/example-form', (c) => {
   return c.json<UiResponse>(
     {
       showForm: {

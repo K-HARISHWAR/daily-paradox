@@ -2,7 +2,7 @@ import './index.css';
 
 import { StrictMode, useState, useCallback, useMemo, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { showToast } from '@devvit/web/client';
+import { showToast, showShareSheet } from '@devvit/web/client';
 import {
   initGameState,
   applyMove,
@@ -83,6 +83,7 @@ export const App = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [countdownText, setCountdownText] = useState<string>('');
   const [currentStreak, setCurrentStreak] = useState<number>(0);
+  const [subredditName, setSubredditName] = useState<string | null>(null);
 
   // Live countdown to next 00:00 UTC daily puzzle reset
   useEffect(() => {
@@ -103,13 +104,17 @@ export const App = () => {
         const res = await fetch('/api/progress');
         if (res.ok) {
           const data: unknown = await res.json();
-          if (
-            typeof data === 'object' &&
-            data !== null &&
-            'currentStreak' in data &&
-            typeof data.currentStreak === 'number'
-          ) {
-            setCurrentStreak(data.currentStreak);
+          if (typeof data === 'object' && data !== null) {
+            if ('currentStreak' in data && typeof data.currentStreak === 'number') {
+              setCurrentStreak(data.currentStreak);
+            }
+            if (
+              'subredditName' in data &&
+              typeof data.subredditName === 'string' &&
+              data.subredditName.length > 0
+            ) {
+              setSubredditName(data.subredditName);
+            }
           }
         }
       } catch {
@@ -203,17 +208,34 @@ export const App = () => {
     activePuzzle.parMoves,
   ]);
 
-  const handleShare = useCallback(() => {
+  const handleShare = useCallback(async () => {
     const isWon = gameState.status === 'won';
     const moves = gameState.movesTaken;
     const score = gameState.score ?? 0;
     const hintsUsed = gameState.unlockedHintTier;
-    const streakStr = currentStreak > 0 ? ` • 🔥 Streak: ${currentStreak}d` : '';
+    const streakStr = currentStreak > 0 ? ` • 🔥 Streak: ${currentStreak} days` : '';
+    const communityLine = subredditName
+      ? `Play today's puzzle in r/${subredditName}!`
+      : "Play today's puzzle on Reddit!";
 
-    const shareText = `DAILY PARADOX [${activePuzzle.date}]
+    const shareTitle = `Daily Paradox (${activePuzzle.date})`;
+    const shareText = `🧩 Daily Paradox (${activePuzzle.date})
 ${isWon ? '🎯 Solved in' : '✕ Out of moves:'} ${moves} moves (Par: ${activePuzzle.parMoves})
-Score: ${score} pts • Hints: ${hintsUsed}/3${streakStr}
-Can you deduce the broken button?`;
+🏆 Score: ${score} pts${streakStr}
+Hints: ${hintsUsed}/3 💡
+${communityLine}`;
+
+    // Try native share sheet first (Devvit Web mobile / supported clients)
+    try {
+      await showShareSheet({
+        title: shareTitle,
+        text: shareText,
+      });
+      showToast('Shared successfully!');
+      return;
+    } catch {
+      // Fallback to clipboard if share sheet fails or is unsupported
+    }
 
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard
@@ -227,7 +249,7 @@ Can you deduce the broken button?`;
     } else {
       showToast('Clipboard not available.');
     }
-  }, [gameState, activePuzzle, currentStreak]);
+  }, [gameState, activePuzzle, currentStreak, subredditName]);
 
   const isGameOver =
     gameState.status === 'won' || gameState.status === 'lost';
@@ -240,6 +262,7 @@ Can you deduce the broken button?`;
           countdownText={countdownText}
           isDevOverride={isDevOverride}
           currentStreak={currentStreak}
+          subredditName={subredditName}
           onOpenHelp={() => setHelpOpen(true)}
           onOpenHints={() => setHintModalOpen(true)}
           unlockedHintCount={gameState.unlockedHintTier}
@@ -312,6 +335,7 @@ Can you deduce the broken button?`;
           parMoves={activePuzzle.parMoves}
           puzzleDate={activePuzzle.date}
           currentStreak={currentStreak}
+          subredditName={subredditName}
           onReset={handleReset}
           onShare={handleShare}
         />

@@ -25,6 +25,8 @@ export type DailyPuzzleResponse = {
   serverUtcDate: string;
   msUntilReset: number;
   isOverride: boolean;
+  subredditName?: string;
+  postId?: string;
 };
 
 export type SubmitScoreRequest = {
@@ -54,6 +56,8 @@ export type ProgressResponse = {
   totalCompleted: number;
   lastCompletedDate: string | null;
   hasCompletedToday: boolean;
+  subredditName?: string;
+  postId?: string;
   todayRecord: {
     puzzleDate: string;
     movesTaken: number;

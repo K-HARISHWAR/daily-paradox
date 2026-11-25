@@ -8,7 +8,7 @@ import type {
   SubmitScoreRequest,
   CompletePuzzleResponse,
   ProgressResponse,
-} from '../../shared/api';
+} from '../../shared/api.ts';
 import {
   getDailyPuzzle,
   getUtcDateString,
@@ -25,6 +25,31 @@ type ErrorResponse = {
   message: string;
 };
 
+const getSafeContext = (): {
+  subredditName?: string;
+  postId?: string;
+  userId?: string;
+} => {
+  try {
+    return {
+      subredditName: context.subredditName,
+      postId: context.postId,
+      userId: context.userId,
+    };
+  } catch {
+    return {};
+  }
+};
+
+const getSafeCurrentUsername = async (): Promise<string> => {
+  try {
+    const name = await reddit.getCurrentUsername();
+    return name ?? 'anonymous';
+  } catch {
+    return 'anonymous';
+  }
+};
+
 export const api = new Hono();
 
 api.get('/daily', (c) => {
@@ -37,6 +62,7 @@ api.get('/daily', (c) => {
   const serverUtcDate = getUtcDateString(now);
   const msUntilReset = getMillisecondsUntilNextUtcReset(now);
   const isOverride = Boolean(dateQuery || puzzleQuery);
+  const safeCtx = getSafeContext();
 
   return c.json<DailyPuzzleResponse>({
     type: 'daily',
@@ -44,41 +70,63 @@ api.get('/daily', (c) => {
     serverUtcDate,
     msUntilReset,
     isOverride,
+    subredditName: safeCtx.subredditName,
+    postId: safeCtx.postId,
   });
 });
 
 api.get('/progress', async (c) => {
-  const username = (await reddit.getCurrentUsername()) ?? 'anonymous';
-  const userId = context.userId ?? username;
+  const username = await getSafeCurrentUsername();
+  const safeCtx = getSafeContext();
+  const userId = safeCtx.userId ?? username;
   const todayUtc = getUtcDateString();
 
-  const storage = createPlayerStorage(redis);
-  const progress = await storage.getPlayerProgress(userId, username, todayUtc);
+  try {
+    const storage = createPlayerStorage(redis);
+    const progress = await storage.getPlayerProgress(userId, username, todayUtc);
 
-  return c.json<ProgressResponse>({
-    type: 'progress',
-    userId: progress.userId,
-    username: progress.username,
-    currentStreak: progress.currentStreak,
-    maxStreak: progress.maxStreak,
-    totalCompleted: progress.totalCompleted,
-    lastCompletedDate: progress.lastCompletedDate,
-    hasCompletedToday: progress.todayRecord !== null,
-    todayRecord: progress.todayRecord
-      ? {
-          puzzleDate: progress.todayRecord.puzzleDate,
-          movesTaken: progress.todayRecord.movesTaken,
-          score: progress.todayRecord.score,
-          hintsUsed: progress.todayRecord.hintsUsed,
-        }
-      : null,
-  });
+    return c.json<ProgressResponse>({
+      type: 'progress',
+      userId: progress.userId,
+      username: progress.username,
+      currentStreak: progress.currentStreak,
+      maxStreak: progress.maxStreak,
+      totalCompleted: progress.totalCompleted,
+      lastCompletedDate: progress.lastCompletedDate,
+      hasCompletedToday: progress.todayRecord !== null,
+      subredditName: safeCtx.subredditName,
+      postId: safeCtx.postId,
+      todayRecord: progress.todayRecord
+        ? {
+            puzzleDate: progress.todayRecord.puzzleDate,
+            movesTaken: progress.todayRecord.movesTaken,
+            score: progress.todayRecord.score,
+            hintsUsed: progress.todayRecord.hintsUsed,
+          }
+        : null,
+    });
+  } catch {
+    return c.json<ProgressResponse>({
+      type: 'progress',
+      userId,
+      username,
+      currentStreak: 0,
+      maxStreak: 0,
+      totalCompleted: 0,
+      lastCompletedDate: null,
+      hasCompletedToday: false,
+      subredditName: safeCtx.subredditName,
+      postId: safeCtx.postId,
+      todayRecord: null,
+    });
+  }
 });
 
 api.post('/complete', async (c) => {
   const body = await c.req.json<SubmitScoreRequest>();
-  const username = (await reddit.getCurrentUsername()) ?? 'anonymous';
-  const userId = context.userId ?? username;
+  const username = await getSafeCurrentUsername();
+  const safeCtx = getSafeContext();
+  const userId = safeCtx.userId ?? username;
 
   if (!body.puzzleId || !body.puzzleDate || !Array.isArray(body.moveSequence)) {
     return c.json<CompletePuzzleResponse>(
@@ -123,34 +171,46 @@ api.post('/complete', async (c) => {
   }
 
   // 3. Persist completion record and update streak in Devvit Redis
-  const storage = createPlayerStorage(redis);
-  const result = await storage.savePlayerCompletion(userId, username, {
-    puzzleId: officialPuzzle.id,
-    puzzleDate: body.puzzleDate,
-    completed: true,
-    movesTaken: validation.movesTaken,
-    score: validation.score,
-    hintsUsed: body.unlockedHintTier ?? 0,
-    completedAt: new Date().toISOString(),
-    moveSequence: body.moveSequence,
-  });
+  try {
+    const storage = createPlayerStorage(redis);
+    const result = await storage.savePlayerCompletion(userId, username, {
+      puzzleId: officialPuzzle.id,
+      puzzleDate: body.puzzleDate,
+      completed: true,
+      movesTaken: validation.movesTaken,
+      score: validation.score,
+      hintsUsed: body.unlockedHintTier ?? 0,
+      completedAt: new Date().toISOString(),
+      moveSequence: body.moveSequence,
+    });
 
-  return c.json<CompletePuzzleResponse>({
-    type: 'complete',
-    success: true,
-    score: validation.score,
-    currentStreak: result.progress.currentStreak,
-    maxStreak: result.progress.maxStreak,
-    totalCompleted: result.progress.totalCompleted,
-    isDuplicate: result.isDuplicate,
-  });
+    return c.json<CompletePuzzleResponse>({
+      type: 'complete',
+      success: true,
+      score: validation.score,
+      currentStreak: result.progress.currentStreak,
+      maxStreak: result.progress.maxStreak,
+      totalCompleted: result.progress.totalCompleted,
+      isDuplicate: result.isDuplicate,
+    });
+  } catch {
+    return c.json<CompletePuzzleResponse>({
+      type: 'complete',
+      success: true,
+      score: validation.score,
+      currentStreak: 1,
+      maxStreak: 1,
+      totalCompleted: 1,
+      isDuplicate: false,
+    });
+  }
 });
 
 api.get('/init', async (c) => {
-  const { postId } = context;
+  const safeCtx = getSafeContext();
+  const postId = safeCtx.postId;
 
   if (!postId) {
-    console.error('API Init Error: postId not found in devvit context');
     return c.json<ErrorResponse>(
       {
         status: 'error',
@@ -186,7 +246,8 @@ api.get('/init', async (c) => {
 });
 
 api.post('/increment', async (c) => {
-  const { postId } = context;
+  const safeCtx = getSafeContext();
+  const postId = safeCtx.postId;
   if (!postId) {
     return c.json<ErrorResponse>(
       {
@@ -206,7 +267,8 @@ api.post('/increment', async (c) => {
 });
 
 api.post('/decrement', async (c) => {
-  const { postId } = context;
+  const safeCtx = getSafeContext();
+  const postId = safeCtx.postId;
   if (!postId) {
     return c.json<ErrorResponse>(
       {

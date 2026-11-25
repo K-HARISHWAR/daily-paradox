@@ -21,7 +21,7 @@
     "items": [
       {
         "label": "Create a new post",
-        "description": "daily-paradox",
+        "description": "Create today's Daily Paradox interactive post",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/post-create"

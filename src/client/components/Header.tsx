@@ -3,6 +3,7 @@ export type HeaderProps = {
   countdownText?: string;
   isDevOverride?: boolean;
   currentStreak?: number;
+  subredditName?: string | null;
   onOpenHelp: () => void;
   onOpenHints: () => void;
   unlockedHintCount: number;
@@ -15,6 +16,7 @@ export const Header = ({
   countdownText,
   isDevOverride,
   currentStreak,
+  subredditName,
   onOpenHelp,
   onOpenHints,
   unlockedHintCount,
@@ -29,6 +31,14 @@ export const Header = ({
           <h1 className="text-base sm:text-lg font-black tracking-wider uppercase bg-gradient-to-r from-cyan-400 via-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
             Daily Paradox
           </h1>
+          {subredditName ? (
+            <span
+              title={`Community: r/${subredditName}`}
+              className="text-[10px] font-bold text-slate-400 bg-slate-800/80 border border-slate-700/60 px-1.5 py-0.5 rounded font-mono"
+            >
+              r/{subredditName}
+            </span>
+          ) : null}
           {isDevOverride ? (
             <span className="text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded">
               Dev Mode
@@ -84,8 +94,8 @@ export const Header = ({
         <button
           type="button"
           onClick={onOpenHelp}
-          aria-label="How to play instructions"
-          className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-700 bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 hover:border-slate-600 transition-all font-bold text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50 cursor-pointer"
+          aria-label="How to play"
+          className="w-7 h-7 flex items-center justify-center text-xs font-bold rounded-lg border border-slate-700 bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700 hover:border-slate-600 transition-all focus:outline-none focus:ring-2 focus:ring-cyan-400/50 cursor-pointer"
         >
           ?
         </button>

@@ -8,6 +8,7 @@ export type ResultModalProps = {
   parMoves: number;
   puzzleDate: string;
   currentStreak?: number;
+  subredditName?: string | null;
   onReset: () => void;
   onShare: () => void;
 };
@@ -20,6 +21,7 @@ export const ResultModal = ({
   parMoves,
   puzzleDate,
   currentStreak,
+  subredditName,
   onReset,
   onShare,
 }: ResultModalProps) => {
@@ -63,6 +65,12 @@ export const ResultModal = ({
               <span>{currentStreak} Day Streak!</span>
             </div>
           ) : null}
+
+          {subredditName ? (
+            <p className="text-[11px] text-slate-500 font-mono mt-1">
+              r/{subredditName} community challenge
+            </p>
+          ) : null}
         </div>
 
         {isWon && score !== null ? (
@@ -101,7 +109,7 @@ export const ResultModal = ({
                 ) : null}
                 {scoreBreakdown.hintPenalty > 0 ? (
                   <div className="flex justify-between text-amber-400">
-                    <span>Hints Used:</span>
+                    <span>Hint Penalty:</span>
                     <span>-{scoreBreakdown.hintPenalty}</span>
                   </div>
                 ) : null}
