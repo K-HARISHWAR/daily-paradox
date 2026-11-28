@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { LeaderboardEntry } from '../../shared/engine/leaderboard.ts';
 
 export type LeaderboardModalProps = {
@@ -21,6 +22,17 @@ export const LeaderboardModal = ({
   currentUserId,
   isLoading,
 }: LeaderboardModalProps) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
@@ -28,6 +40,9 @@ export const LeaderboardModal = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="leaderboard-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
     >
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl flex flex-col gap-4 max-h-[85vh]">
@@ -51,7 +66,7 @@ export const LeaderboardModal = ({
             type="button"
             onClick={onClose}
             aria-label="Close leaderboard"
-            className="w-7 h-7 flex items-center justify-center text-xs font-bold rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-all cursor-pointer"
+            className="w-8 h-8 min-h-[36px] min-w-[36px] flex items-center justify-center text-xs font-bold rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 cursor-pointer"
           >
             ✕
           </button>
@@ -70,8 +85,12 @@ export const LeaderboardModal = ({
         {/* Entries list or empty state */}
         <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2 min-h-[220px]">
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center h-48 text-slate-400 text-xs gap-2">
-              <span className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+            <div
+              role="status"
+              aria-label="Loading leaderboard..."
+              className="flex flex-col items-center justify-center h-48 text-slate-400 text-xs gap-2"
+            >
+              <span className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
               <span>Loading leaderboard...</span>
             </div>
           ) : entries.length === 0 ? (
@@ -80,7 +99,7 @@ export const LeaderboardModal = ({
               <p className="text-sm font-bold text-slate-200">
                 No solvers yet for today!
               </p>
-              <p className="text-xs text-slate-500 max-w-xs">
+              <p className="text-xs text-slate-400 max-w-xs">
                 Be the first to crack today&apos;s broken button and hit the target to claim the #1 spot!
               </p>
             </div>
@@ -130,7 +149,7 @@ export const LeaderboardModal = ({
                         {entry.username}
                         {isCurrentUser ? ' (You)' : ''}
                       </span>
-                      <span className="text-[10px] text-slate-500">
+                      <span className="text-[10px] text-slate-400">
                         {entry.movesTaken} moves • {entry.hintsUsed} hints
                       </span>
                     </div>
@@ -141,7 +160,7 @@ export const LeaderboardModal = ({
                     <span className="font-bold text-sm text-cyan-300">
                       {entry.score}
                     </span>
-                    <span className="text-[10px] text-slate-500">pts</span>
+                    <span className="text-[10px] text-slate-400">pts</span>
                   </div>
                 </div>
               );
@@ -150,12 +169,12 @@ export const LeaderboardModal = ({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-slate-800/80 pt-3 flex justify-between items-center text-[11px] text-slate-500">
+        <div className="border-t border-slate-800/80 pt-3 flex justify-between items-center text-[11px] text-slate-400">
           <span>Ranked by Score &gt; Moves &gt; Time</span>
           <button
             type="button"
             onClick={onClose}
-            className="py-1.5 px-4 rounded-xl font-bold text-xs uppercase bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all cursor-pointer"
+            className="min-h-[36px] py-1.5 px-4 rounded-xl font-bold text-xs uppercase bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 cursor-pointer"
           >
             Close
           </button>

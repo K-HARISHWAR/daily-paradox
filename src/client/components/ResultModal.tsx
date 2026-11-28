@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { ScoreBreakdown } from '../../shared/engine/types.ts';
 
 export type ResultModalProps = {
@@ -34,6 +34,16 @@ export const ResultModal = ({
 }: ResultModalProps) => {
   const isWon = status === 'won';
   const [includeReveal, setIncludeReveal] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onReset();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onReset]);
 
   return (
     <div
@@ -75,7 +85,7 @@ export const ResultModal = ({
           ) : null}
 
           {subredditName ? (
-            <p className="text-[11px] text-slate-500 font-mono mt-1">
+            <p className="text-[11px] text-slate-400 font-mono mt-1">
               r/{subredditName} community challenge
             </p>
           ) : null}
@@ -84,7 +94,7 @@ export const ResultModal = ({
         {/* Move Trail */}
         {isWon && moveTrail ? (
           <div className="w-full py-1.5 px-3 rounded-lg bg-slate-950/60 border border-slate-800/80 flex items-center justify-center gap-1.5 font-mono text-xs">
-            <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider">
               Trail:
             </span>
             <span className="tracking-widest">{moveTrail}</span>
@@ -145,12 +155,12 @@ export const ResultModal = ({
 
         {/* Optional Paradox Reveal Toggle */}
         {isWon ? (
-          <label className="flex items-center justify-center gap-2 text-[11px] text-slate-400 cursor-pointer select-none">
+          <label className="flex items-center justify-center gap-2 text-[11px] text-slate-300 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={includeReveal}
               onChange={(e) => setIncludeReveal(e.target.checked)}
-              className="w-3.5 h-3.5 rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-cyan-400 cursor-pointer"
+              className="w-4 h-4 rounded bg-slate-800 border-slate-700 text-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 cursor-pointer"
             />
             <span>Include Paradox Reveal in Share (Spoiler Tagged)</span>
           </label>
@@ -162,7 +172,7 @@ export const ResultModal = ({
             <button
               type="button"
               onClick={() => onShare(includeReveal)}
-              className="w-full py-2.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider bg-gradient-to-r from-cyan-500 to-violet-600 hover:from-cyan-400 hover:to-violet-500 text-white shadow-lg shadow-violet-900/30 transition-all focus:outline-none focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+              className="w-full min-h-[44px] py-2.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider bg-gradient-to-r from-cyan-500 to-violet-600 hover:from-cyan-400 hover:to-violet-500 text-white shadow-lg shadow-violet-900/30 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 cursor-pointer"
             >
               Share Result Card
             </button>
@@ -172,7 +182,7 @@ export const ResultModal = ({
             <button
               type="button"
               onClick={onOpenLeaderboard}
-              className="w-full py-2 px-3 rounded-xl font-bold text-xs uppercase tracking-wider bg-slate-800/80 hover:bg-slate-700 text-amber-300 border border-slate-700 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full min-h-[40px] py-2 px-3 rounded-xl font-bold text-xs uppercase tracking-wider bg-slate-800/80 hover:bg-slate-700 text-amber-300 border border-slate-700 transition-all flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 cursor-pointer"
             >
               <span>🏆</span>
               <span>View Daily Leaderboard</span>
@@ -183,7 +193,7 @@ export const ResultModal = ({
             <button
               type="button"
               onClick={onDiscuss}
-              className="w-full py-2 px-3 rounded-xl font-bold text-xs uppercase tracking-wider bg-slate-800/60 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full min-h-[40px] py-2 px-3 rounded-xl font-bold text-xs uppercase tracking-wider bg-slate-800/60 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 cursor-pointer"
             >
               <span>💬</span>
               <span>Discuss on Reddit</span>
@@ -193,9 +203,9 @@ export const ResultModal = ({
           <button
             type="button"
             onClick={onReset}
-            className={`w-full py-2 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border cursor-pointer ${
+            className={`w-full min-h-[44px] py-2 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 cursor-pointer ${
               isWon
-                ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700'
                 : 'bg-rose-600 hover:bg-rose-500 text-white border-rose-500 shadow-lg shadow-rose-900/30'
             }`}
           >

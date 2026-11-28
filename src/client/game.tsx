@@ -1,6 +1,13 @@
 import './index.css';
 
-import { StrictMode, useState, useCallback, useMemo, useEffect } from 'react';
+import {
+  StrictMode,
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useRef,
+} from 'react';
 import { createRoot } from 'react-dom/client';
 import { showToast, showShareSheet, navigateTo } from '@devvit/web/client';
 import {
@@ -97,6 +104,9 @@ export const App = () => {
   const [subredditName, setSubredditName] = useState<string | null>(null);
   const [postId, setPostId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Anti-corruption lock to prevent double-clicks or rapid inputs from corrupting move state
+  const isApplyingMoveRef = useRef(false);
 
   // Live countdown to next 00:00 UTC daily puzzle reset
   useEffect(() => {
@@ -262,9 +272,15 @@ export const App = () => {
     [gameState.history, gameState.status]
   );
 
+  const isGameOver =
+    gameState.status === 'won' || gameState.status === 'lost';
+
   const handleApplyOperation = useCallback(
     (operationId: string) => {
+      if (isApplyingMoveRef.current || isGameOver) return;
+      isApplyingMoveRef.current = true;
       setErrorMessage(null);
+
       const res = applyMove(gameState, activePuzzle, operationId);
       if (res.success) {
         setGameState(res.state);
@@ -274,8 +290,13 @@ export const App = () => {
       } else if (res.error) {
         setErrorMessage(res.error);
       }
+
+      // 50ms guard against touch bounce / double-tap race conditions
+      setTimeout(() => {
+        isApplyingMoveRef.current = false;
+      }, 50);
     },
-    [gameState, activePuzzle, submitWinCompletion]
+    [gameState, activePuzzle, isGameOver, submitWinCompletion]
   );
 
   const handleReset = useCallback(() => {
@@ -290,6 +311,54 @@ export const App = () => {
     },
     []
   );
+
+  // Global keyboard shortcuts for desktop & keyboard accessibility
+  const isAnyModalOpen =
+    helpOpen || hintModalOpen || leaderboardOpen || isGameOver;
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isAnyModalOpen) return;
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+      if (key >= '1' && key <= '4') {
+        const index = Number(key) - 1;
+        const op = clientPuzzle.operations[index];
+        if (op) {
+          e.preventDefault();
+          handleApplyOperation(op.id);
+        }
+      } else if (key === 'r') {
+        e.preventDefault();
+        handleReset();
+      } else if (key === 'h') {
+        e.preventDefault();
+        setHintModalOpen(true);
+      } else if (key === '?' || (e.shiftKey && key === '/')) {
+        e.preventDefault();
+        setHelpOpen(true);
+      } else if (key === 'l') {
+        e.preventDefault();
+        setLeaderboardOpen(true);
+        void fetchLeaderboard();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    isAnyModalOpen,
+    clientPuzzle.operations,
+    handleApplyOperation,
+    handleReset,
+    fetchLeaderboard,
+  ]);
 
   const scoreBreakdown: ScoreBreakdown | null = useMemo(() => {
     if (gameState.status !== 'won') return null;
@@ -379,11 +448,8 @@ export const App = () => {
     navigateTo(postUrl);
   }, [postId, subredditName]);
 
-  const isGameOver =
-    gameState.status === 'won' || gameState.status === 'lost';
-
   return (
-    <div className="min-h-screen w-full flex flex-col items-center bg-[#0a0e17] text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="min-h-screen w-full flex flex-col items-center bg-[#0a0e17] text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-200 overflow-x-hidden">
       <div className="w-full max-w-lg flex flex-col min-h-screen border-x border-slate-900/60 shadow-2xl">
         <Header
           puzzleDate={activePuzzle.date}
@@ -402,7 +468,7 @@ export const App = () => {
           canReset={gameState.movesTaken > 0 || isGameOver}
         />
 
-        <main className="flex-1 flex flex-col p-4 gap-4 justify-between">
+        <main className="flex-1 flex flex-col p-3 sm:p-4 gap-4 justify-between">
           <div className="flex flex-col gap-4">
             {/* Dashboard displaying start, current, target, and moves remaining */}
             <Dashboard
@@ -418,13 +484,18 @@ export const App = () => {
             {errorMessage ? (
               <div
                 role="alert"
-                className="w-full py-2 px-3 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-300 text-xs flex items-center justify-between animate-fade-in"
+                aria-live="assertive"
+                className="w-full py-2.5 px-3 rounded-xl bg-rose-950/70 border border-rose-800 text-rose-200 text-xs flex items-center justify-between animate-fade-in shadow-md"
               >
-                <span>{errorMessage}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-rose-400 font-bold">⚠️</span>
+                  <span>{errorMessage}</span>
+                </div>
                 <button
                   type="button"
                   onClick={() => setErrorMessage(null)}
-                  className="text-rose-400 hover:text-rose-200 font-bold ml-2 cursor-pointer"
+                  aria-label="Dismiss error"
+                  className="min-h-[32px] min-w-[32px] flex items-center justify-center text-rose-400 hover:text-rose-100 font-bold ml-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 rounded cursor-pointer"
                 >
                   ✕
                 </button>
@@ -442,7 +513,7 @@ export const App = () => {
             <MoveHistory history={gameState.history} />
           </div>
 
-          <footer className="w-full text-center py-2 text-[11px] text-slate-500 border-t border-slate-900/80 flex flex-col gap-0.5">
+          <footer className="w-full text-center py-2.5 text-[11px] text-slate-400 border-t border-slate-900/80 flex flex-col gap-0.5 select-none">
             <span>Daily Paradox • Resets daily at 00:00 UTC</span>
           </footer>
         </main>
