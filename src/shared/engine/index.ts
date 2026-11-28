@@ -7,3 +7,5 @@ export * from './solver.ts';
 export * from './catalog.ts';
 export * from './daily.ts';
 export * from './streak.ts';
+export * from './leaderboard.ts';
+export * from './share.ts';

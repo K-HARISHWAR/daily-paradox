@@ -6,6 +6,8 @@ import type {
 import { applyOperation, applyStandard } from '../../shared/engine/operations.ts';
 import { calculateScore } from '../../shared/engine/scoring.ts';
 import { calculateUpdatedStreak } from '../../shared/engine/streak.ts';
+import type { LeaderboardEntry } from '../../shared/engine/leaderboard.ts';
+import { sortLeaderboard, calculateUserRank } from '../../shared/engine/leaderboard.ts';
 
 export type StorageClient = {
   get(key: string): Promise<string | undefined>;
@@ -115,6 +117,72 @@ export const createPlayerStorage = (storage: StorageClient) => {
   const getProgressKey = (userId: string) => `user:${userId}:progress`;
   const getDailyKey = (userId: string, date: string) =>
     `user:${userId}:daily:${date}`;
+  const getLeaderboardKey = (date: string) => `leaderboard:${date}`;
+
+  const getLeaderboard = async (
+    date: string,
+    currentUserId?: string
+  ): Promise<{
+    entries: LeaderboardEntry[];
+    totalPlayers: number;
+    userRank: number | null;
+  }> => {
+    try {
+      const raw = await storage.get(getLeaderboardKey(date));
+      if (!raw) {
+        return {
+          entries: [],
+          totalPlayers: 0,
+          userRank: null,
+        };
+      }
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return {
+          entries: [],
+          totalPlayers: 0,
+          userRank: null,
+        };
+      }
+      const validEntries: LeaderboardEntry[] = [];
+      for (const item of parsed) {
+        if (
+          isRecord(item) &&
+          typeof item.userId === 'string' &&
+          typeof item.username === 'string' &&
+          typeof item.score === 'number' &&
+          typeof item.movesTaken === 'number' &&
+          typeof item.hintsUsed === 'number' &&
+          typeof item.completedAt === 'string'
+        ) {
+          validEntries.push({
+            userId: item.userId,
+            username: item.username,
+            score: item.score,
+            movesTaken: item.movesTaken,
+            hintsUsed: item.hintsUsed,
+            completedAt: item.completedAt,
+          });
+        }
+      }
+      const sorted = sortLeaderboard(validEntries, 50);
+      const userRank = currentUserId
+        ? calculateUserRank(sorted, currentUserId)
+        : null;
+
+      return {
+        entries: sorted,
+        totalPlayers: validEntries.length,
+        userRank,
+      };
+    } catch {
+      return {
+        entries: [],
+        totalPlayers: 0,
+        userRank: null,
+      };
+    }
+  };
 
   const getPlayerProgress = async (
     userId: string,
@@ -243,6 +311,24 @@ export const createPlayerStorage = (storage: StorageClient) => {
     };
 
     try {
+      const existingBoard = await getLeaderboard(record.puzzleDate);
+      const entriesMap = new Map<string, LeaderboardEntry>();
+      for (const entry of existingBoard.entries) {
+        entriesMap.set(entry.userId, entry);
+      }
+      entriesMap.set(userId, {
+        userId,
+        username,
+        score: record.score,
+        movesTaken: record.movesTaken,
+        hintsUsed: record.hintsUsed,
+        completedAt: record.completedAt,
+      });
+      const updatedEntries = sortLeaderboard(
+        Array.from(entriesMap.values()),
+        50
+      );
+
       await Promise.all([
         storage.set(
           getProgressKey(userId),
@@ -257,9 +343,13 @@ export const createPlayerStorage = (storage: StorageClient) => {
           getDailyKey(userId, record.puzzleDate),
           JSON.stringify(record)
         ),
+        storage.set(
+          getLeaderboardKey(record.puzzleDate),
+          JSON.stringify(updatedEntries)
+        ),
       ]);
     } catch (err) {
-      console.error('Error persisting player completion:', err);
+      console.error('Error persisting player completion or leaderboard:', err);
     }
 
     return {
@@ -271,5 +361,6 @@ export const createPlayerStorage = (storage: StorageClient) => {
   return {
     getPlayerProgress,
     savePlayerCompletion,
+    getLeaderboard,
   };
 };

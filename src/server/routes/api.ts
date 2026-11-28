@@ -8,10 +8,12 @@ import type {
   SubmitScoreRequest,
   CompletePuzzleResponse,
   ProgressResponse,
+  LeaderboardResponse,
 } from '../../shared/api.ts';
 import {
   getDailyPuzzle,
   getUtcDateString,
+  parseUtcDateString,
   getMillisecondsUntilNextUtcReset,
   sanitizePuzzleForClient,
 } from '../../shared/engine/index.ts';
@@ -118,6 +120,37 @@ api.get('/progress', async (c) => {
       subredditName: safeCtx.subredditName,
       postId: safeCtx.postId,
       todayRecord: null,
+    });
+  }
+});
+
+api.get('/leaderboard', async (c) => {
+  const dateQuery = c.req.query('date');
+  const targetDate =
+    dateQuery && parseUtcDateString(dateQuery)
+      ? dateQuery
+      : getUtcDateString();
+  const username = await getSafeCurrentUsername();
+  const safeCtx = getSafeContext();
+  const userId = safeCtx.userId ?? username;
+
+  try {
+    const storage = createPlayerStorage(redis);
+    const result = await storage.getLeaderboard(targetDate, userId);
+    return c.json<LeaderboardResponse>({
+      type: 'leaderboard',
+      puzzleDate: targetDate,
+      entries: result.entries,
+      totalPlayers: result.totalPlayers,
+      userRank: result.userRank,
+    });
+  } catch {
+    return c.json<LeaderboardResponse>({
+      type: 'leaderboard',
+      puzzleDate: targetDate,
+      entries: [],
+      totalPlayers: 0,
+      userRank: null,
     });
   }
 });

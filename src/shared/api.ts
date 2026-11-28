@@ -1,4 +1,5 @@
 import type { SanitizedPuzzle } from './engine/types.ts';
+import type { LeaderboardEntry } from './engine/leaderboard.ts';
 
 export type InitResponse = {
   type: 'init';
@@ -64,4 +65,12 @@ export type ProgressResponse = {
     score: number;
     hintsUsed: number;
   } | null;
+};
+
+export type LeaderboardResponse = {
+  type: 'leaderboard';
+  puzzleDate: string;
+  entries: LeaderboardEntry[];
+  totalPlayers: number;
+  userRank: number | null;
 };

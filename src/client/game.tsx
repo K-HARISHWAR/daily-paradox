@@ -2,7 +2,7 @@ import './index.css';
 
 import { StrictMode, useState, useCallback, useMemo, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { showToast, showShareSheet } from '@devvit/web/client';
+import { showToast, showShareSheet, navigateTo } from '@devvit/web/client';
 import {
   initGameState,
   applyMove,
@@ -11,10 +11,14 @@ import {
   calculateScore,
   sanitizePuzzleForClient,
   getDailyPuzzle,
+  getEpochDayIndex,
   getMillisecondsUntilNextUtcReset,
   formatTimeUntilReset,
+  generateMoveTrail,
+  generateShareText,
 } from '../shared/engine/index.ts';
 import type { GameState, HintTier, Puzzle, ScoreBreakdown } from '../shared/engine/index.ts';
+import type { LeaderboardEntry } from '../shared/engine/leaderboard.ts';
 import type { SubmitScoreRequest } from '../shared/api.ts';
 import { Header } from './components/Header.tsx';
 import { Dashboard } from './components/Dashboard.tsx';
@@ -23,6 +27,7 @@ import { MoveHistory } from './components/MoveHistory.tsx';
 import { HelpModal } from './components/HelpModal.tsx';
 import { ResultModal } from './components/ResultModal.tsx';
 import { HintModal } from './components/HintModal.tsx';
+import { LeaderboardModal } from './components/LeaderboardModal.tsx';
 
 const ONBOARDING_KEY = 'daily_paradox_seen_onboarding';
 
@@ -80,10 +85,18 @@ export const App = () => {
     return false;
   });
   const [hintModalOpen, setHintModalOpen] = useState(false);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);
+  const [totalPlayers, setTotalPlayers] = useState(0);
+  const [userRank, setUserRank] = useState<number | null>(null);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [countdownText, setCountdownText] = useState<string>('');
   const [currentStreak, setCurrentStreak] = useState<number>(0);
   const [subredditName, setSubredditName] = useState<string | null>(null);
+  const [postId, setPostId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Live countdown to next 00:00 UTC daily puzzle reset
   useEffect(() => {
@@ -96,6 +109,52 @@ export const App = () => {
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const fetchLeaderboard = useCallback(async () => {
+    setLeaderboardLoading(true);
+    try {
+      const res = await fetch(`/api/leaderboard?date=${activePuzzle.date}`);
+      if (res.ok) {
+        const data: unknown = await res.json();
+        if (
+          typeof data === 'object' &&
+          data !== null &&
+          'entries' in data &&
+          Array.isArray(data.entries)
+        ) {
+          const list: LeaderboardEntry[] = [];
+          for (const item of data.entries) {
+            if (
+              typeof item === 'object' &&
+              item !== null &&
+              typeof item.userId === 'string' &&
+              typeof item.username === 'string' &&
+              typeof item.score === 'number' &&
+              typeof item.movesTaken === 'number' &&
+              typeof item.hintsUsed === 'number' &&
+              typeof item.completedAt === 'string'
+            ) {
+              list.push(item);
+            }
+          }
+          setLeaderboardEntries(list);
+          if ('totalPlayers' in data && typeof data.totalPlayers === 'number') {
+            setTotalPlayers(data.totalPlayers);
+          }
+          if (
+            'userRank' in data &&
+            (typeof data.userRank === 'number' || data.userRank === null)
+          ) {
+            setUserRank(data.userRank);
+          }
+        }
+      }
+    } catch {
+      // Graceful fallback for offline / mock testing
+    } finally {
+      setLeaderboardLoading(false);
+    }
+  }, [activePuzzle.date]);
 
   // Fetch initial progress from server
   useEffect(() => {
@@ -114,6 +173,20 @@ export const App = () => {
               data.subredditName.length > 0
             ) {
               setSubredditName(data.subredditName);
+            }
+            if (
+              'postId' in data &&
+              typeof data.postId === 'string' &&
+              data.postId.length > 0
+            ) {
+              setPostId(data.postId);
+            }
+            if (
+              'userId' in data &&
+              typeof data.userId === 'string' &&
+              data.userId.length > 0
+            ) {
+              setCurrentUserId(data.userId);
             }
           }
         }
@@ -150,17 +223,43 @@ export const App = () => {
           ) {
             setCurrentStreak(data.currentStreak);
           }
+          void fetchLeaderboard();
         }
       } catch {
         // Gracefully continue with client score
       }
     },
-    [activePuzzle.id, activePuzzle.date]
+    [activePuzzle.id, activePuzzle.date, fetchLeaderboard]
   );
 
   const clientPuzzle = useMemo(
     () => sanitizePuzzleForClient(activePuzzle),
     [activePuzzle]
+  );
+
+  const paradoxDetails = useMemo(() => {
+    const paradoxOp = activePuzzle.operations.find(
+      (op) => op.paradox !== undefined
+    );
+    if (!paradoxOp || !paradoxOp.paradox) return null;
+    let description = '';
+    if (paradoxOp.paradox.kind === 'offset') {
+      const delta = paradoxOp.paradox.delta;
+      description = `actually offset by ${delta > 0 ? `+${delta}` : delta} on each tap`;
+    } else if (paradoxOp.paradox.kind === 'invert') {
+      description = 'inverted operation polarity';
+    } else if (paradoxOp.paradox.kind === 'replace') {
+      description = `actually executes ${paradoxOp.paradox.actualType} ${paradoxOp.paradox.actualValue}`;
+    }
+    return {
+      label: paradoxOp.label,
+      description,
+    };
+  }, [activePuzzle.operations]);
+
+  const moveTrail = useMemo(
+    () => generateMoveTrail(gameState.history, gameState.status === 'won'),
+    [gameState.history, gameState.status]
   );
 
   const handleApplyOperation = useCallback(
@@ -208,48 +307,77 @@ export const App = () => {
     activePuzzle.parMoves,
   ]);
 
-  const handleShare = useCallback(async () => {
-    const isWon = gameState.status === 'won';
-    const moves = gameState.movesTaken;
-    const score = gameState.score ?? 0;
-    const hintsUsed = gameState.unlockedHintTier;
-    const streakStr = currentStreak > 0 ? ` • 🔥 Streak: ${currentStreak} days` : '';
-    const communityLine = subredditName
-      ? `Play today's puzzle in r/${subredditName}!`
-      : "Play today's puzzle on Reddit!";
+  const handleShare = useCallback(
+    async (includeReveal = false) => {
+      const isWon = gameState.status === 'won';
+      const moves = gameState.movesTaken;
+      const score = gameState.score ?? 0;
+      const hintsUsed = gameState.unlockedHintTier;
+      const epochDay = getEpochDayIndex(activePuzzle.date);
 
-    const shareTitle = `Daily Paradox (${activePuzzle.date})`;
-    const shareText = `🧩 Daily Paradox (${activePuzzle.date})
-${isWon ? '🎯 Solved in' : '✕ Out of moves:'} ${moves} moves (Par: ${activePuzzle.parMoves})
-🏆 Score: ${score} pts${streakStr}
-Hints: ${hintsUsed}/3 💡
-${communityLine}`;
-
-    // Try native share sheet first (Devvit Web mobile / supported clients)
-    try {
-      await showShareSheet({
-        title: shareTitle,
-        text: shareText,
+      const shareText = generateShareText({
+        epochDay,
+        puzzleDate: activePuzzle.date,
+        isWon,
+        movesTaken: moves,
+        parMoves: activePuzzle.parMoves,
+        score,
+        hintsUsed,
+        currentStreak,
+        subredditName,
+        history: gameState.history,
+        includeReveal,
+        paradoxOperationLabel: paradoxDetails?.label,
+        paradoxDescription: paradoxDetails?.description,
       });
-      showToast('Shared successfully!');
-      return;
-    } catch {
-      // Fallback to clipboard if share sheet fails or is unsupported
-    }
 
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard
-        .writeText(shareText)
-        .then(() => {
-          showToast('Result copied to clipboard!');
-        })
-        .catch(() => {
-          showToast('Failed to copy result.');
+      const shareTitle = `Daily Paradox #${epochDay} (${activePuzzle.date})`;
+
+      try {
+        await showShareSheet({
+          title: shareTitle,
+          text: shareText,
         });
-    } else {
-      showToast('Clipboard not available.');
-    }
-  }, [gameState, activePuzzle, currentStreak, subredditName]);
+        showToast('Shared successfully!');
+        return;
+      } catch {
+        // Fallback to clipboard if share sheet fails or is unsupported
+      }
+
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        navigator.clipboard
+          .writeText(shareText)
+          .then(() => {
+            showToast('Result copied to clipboard!');
+          })
+          .catch(() => {
+            showToast('Failed to copy result.');
+          });
+      } else {
+        showToast('Clipboard not available.');
+      }
+    },
+    [
+      gameState.status,
+      gameState.movesTaken,
+      gameState.score,
+      gameState.unlockedHintTier,
+      gameState.history,
+      activePuzzle.date,
+      activePuzzle.parMoves,
+      currentStreak,
+      subredditName,
+      paradoxDetails,
+    ]
+  );
+
+  const handleDiscuss = useCallback(() => {
+    const postUrl =
+      postId && subredditName
+        ? `https://reddit.com/r/${subredditName}/comments/${postId}`
+        : `https://reddit.com/r/${subredditName ?? 'daily_paradox_dev'}`;
+    navigateTo(postUrl);
+  }, [postId, subredditName]);
 
   const isGameOver =
     gameState.status === 'won' || gameState.status === 'lost';
@@ -265,6 +393,10 @@ ${communityLine}`;
           subredditName={subredditName}
           onOpenHelp={() => setHelpOpen(true)}
           onOpenHints={() => setHintModalOpen(true)}
+          onOpenLeaderboard={() => {
+            setLeaderboardOpen(true);
+            void fetchLeaderboard();
+          }}
           unlockedHintCount={gameState.unlockedHintTier}
           onReset={handleReset}
           canReset={gameState.movesTaken > 0 || isGameOver}
@@ -326,6 +458,17 @@ ${communityLine}`;
         onUnlockNext={handleUnlockHint}
       />
 
+      <LeaderboardModal
+        isOpen={leaderboardOpen}
+        onClose={() => setLeaderboardOpen(false)}
+        entries={leaderboardEntries}
+        totalPlayers={totalPlayers}
+        userRank={userRank}
+        puzzleDate={activePuzzle.date}
+        currentUserId={currentUserId ?? undefined}
+        isLoading={leaderboardLoading}
+      />
+
       {isGameOver ? (
         <ResultModal
           status={gameState.status === 'won' ? 'won' : 'lost'}
@@ -336,8 +479,14 @@ ${communityLine}`;
           puzzleDate={activePuzzle.date}
           currentStreak={currentStreak}
           subredditName={subredditName}
+          moveTrail={moveTrail}
           onReset={handleReset}
           onShare={handleShare}
+          onOpenLeaderboard={() => {
+            setLeaderboardOpen(true);
+            void fetchLeaderboard();
+          }}
+          onDiscuss={handleDiscuss}
         />
       ) : null}
     </div>
